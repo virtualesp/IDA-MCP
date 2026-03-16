@@ -80,13 +80,13 @@ def forward(tool: str, params: Optional[dict] = None, port: Optional[int] = None
     }
     if timeout and timeout > 0:
         body["timeout"] = timeout
-    # HTTP 层超时需要比协调器内部工具超时更长，留出锁获取+连接建立的余量
+    # HTTP 层超时需要比网关内部工具超时更长，留出锁获取+连接建立的余量
     http_timeout = (timeout + 15) if (timeout and timeout > 0) else None
     result = http_post('/call', body, timeout=http_timeout)
     
     # 处理结果
     if result is None:
-        return {"error": "Failed to connect to coordinator. Is registry running on 127.0.0.1:11337?"}
+        return {"error": "Failed to connect to gateway. Ensure the standalone gateway is running and reachable."}
     
     # 提取实际数据
     if isinstance(result, dict):

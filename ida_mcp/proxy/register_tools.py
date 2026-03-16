@@ -542,3 +542,10 @@ def register_tools(server: Any) -> None:
         timeout: Annotated[Optional[int], Field(description="Timeout in seconds")] = None,
     ) -> dict:
         return api_lifecycle.close_ida(save=save, port=port, timeout=timeout)
+
+    @server.tool(description="Request shutdown of the standalone gateway. Refuses while instances are registered unless force=true.")
+    def shutdown_gateway(
+        force: Annotated[bool, Field(description="Allow shutdown even if instances are still registered")] = False,
+        timeout: Annotated[Optional[int], Field(description="Timeout in seconds")] = None,
+    ) -> dict:
+        return api_lifecycle.shutdown_gateway(force=force, timeout=timeout)

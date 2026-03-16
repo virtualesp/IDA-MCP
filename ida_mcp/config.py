@@ -9,12 +9,9 @@
     - enable_http: 是否启用 HTTP 代理模式 (默认 true)
     - enable_unsafe: 是否启用 unsafe 工具 (默认 true)
 
-协调器配置 (内部组件，地址固定为 127.0.0.1):
-    - coordinator_port: 协调器端口 (默认 11337)
-
 HTTP 代理配置:
-    - http_host: HTTP 代理监听地址 (默认 127.0.0.1)
-    - http_port: HTTP 代理端口 (默认 11338)
+    - http_host: 网关监听地址 (默认 127.0.0.1)
+    - http_port: 网关监听端口 (默认 11338)
     - http_path: MCP 端点路径 (默认 /mcp)
 
 IDA 实例配置 (内部组件，地址固定为 127.0.0.1):
@@ -42,7 +39,7 @@ _DEFAULT_CONFIG = {
     "enable_http": True,    # 是否启用 HTTP 代理模式
     "enable_unsafe": True,  # 是否启用 unsafe 工具
     
-    # 协调器配置（地址固定为 127.0.0.1，仅端口可配置）
+    # 协调器配置（已并入网关；保留键用于兼容旧配置）
     "coordinator_port": 11337,
     
     # HTTP 代理配置
@@ -146,27 +143,36 @@ def load_config(reload: bool = False) -> Dict[str, Any]:
 
 
 # ============================================================================
-# 协调器配置访问函数
+# 网关 / 协调器配置访问函数
 # ============================================================================
 
-# 协调器是纯内部组件，地址固定为 127.0.0.1
-_COORDINATOR_HOST = "127.0.0.1"
+def get_http_bind_host() -> str:
+    """获取 HTTP 网关监听地址。"""
+    config = load_config()
+    return str(config.get("http_host", "127.0.0.1"))
+
+
+def get_http_connect_host() -> str:
+    """获取客户端访问 HTTP 网关时应使用的地址。"""
+    host = get_http_bind_host().strip()
+    if host in {"0.0.0.0", "::", ""}:
+        return "127.0.0.1"
+    return host
 
 
 def get_coordinator_host() -> str:
-    """获取协调器监听地址（固定为 127.0.0.1，不可配置）。"""
-    return _COORDINATOR_HOST
+    """获取内部 API 的客户端访问地址。"""
+    return get_http_connect_host()
 
 
 def get_coordinator_port() -> int:
-    """获取协调器端口。"""
-    config = load_config()
-    return int(config.get("coordinator_port", 11337))
+    """获取协调器内部 API 所在端口（与网关端口一致）。"""
+    return get_http_port()
 
 
 def get_coordinator_url() -> str:
-    """获取协调器连接 URL。"""
-    return f"http://{_COORDINATOR_HOST}:{get_coordinator_port()}"
+    """获取协调器内部 API 基础 URL。"""
+    return f"http://{get_http_connect_host()}:{get_http_port()}/internal"
 
 
 # ============================================================================
@@ -174,9 +180,8 @@ def get_coordinator_url() -> str:
 # ============================================================================
 
 def get_http_host() -> str:
-    """获取 HTTP 代理监听地址。"""
-    config = load_config()
-    return str(config.get("http_host", "127.0.0.1"))
+    """获取 HTTP 网关监听地址。兼容旧调用。"""
+    return get_http_bind_host()
 
 
 def get_http_port() -> int:
@@ -192,8 +197,8 @@ def get_http_path() -> str:
 
 
 def get_http_url() -> str:
-    """获取完整的 HTTP 代理 URL。"""
-    host = get_http_host()
+    """获取客户端访问用的完整 HTTP 网关 URL。"""
+    host = get_http_connect_host()
     port = get_http_port()
     path = get_http_path()
     return f"http://{host}:{port}{path}"

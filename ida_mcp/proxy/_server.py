@@ -41,6 +41,7 @@ server = FastMCP(
 生命周期工具:
 - open_in_ida: 启动 IDA 并打开指定文件
 - close_ida: 关闭目标 IDA 实例
+- shutdown_gateway: 安全关闭独立网关进程
 
 核心工具:
 - list_functions, get_metadata, list_strings, list_globals, list_local_types, get_entry_points
