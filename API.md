@@ -141,8 +141,10 @@ proxy/control 面的包装错误常见格式：
 
 - 启动 IDA 子进程时设置 `IDA_MCP_AUTO_START=1`
 - 同时设置预留端口环境变量 `IDA_MCP_PORT`
+- `open_in_ida_use_autonomous=true` 时，默认追加 `-A`；若 `extra_args` 已显式包含 `-A`，则不会重复追加
 - 如果 `IDA_MCP_BUNDLE_DIR` 或 `open_in_ida_bundle_dir` 已配置，则会在该目录下创建时间戳子目录
 - 若目标旁边存在匹配的 `.i64/.idb`，则优先打开数据库，以避免再次弹出 loader/options 确认框
+- `-A` 会把 IDA 切到 batch/autonomous 启动模式，更适合无人值守自动化；如果你需要正常交互式 GUI 流程，不要把它设成默认
 
 ## 4. Backend Tool Catalog
 

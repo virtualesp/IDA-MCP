@@ -11,7 +11,12 @@ import time
 from typing import List, Optional
 
 from .. import registry
-from ..config import get_ida_default_port, get_ida_path, get_open_in_ida_bundle_dir
+from ..config import (
+    get_ida_default_port,
+    get_ida_path,
+    get_open_in_ida_bundle_dir,
+    get_open_in_ida_use_autonomous,
+)
 from ._state import forward, get_instances
 
 
@@ -217,7 +222,7 @@ def open_in_ida(
     file_path: str,
     extra_args: Optional[List[str]] = None,
 ) -> dict:
-    """Launch interactive IDA and request plugin auto-start."""
+    """Launch IDA and request plugin auto-start."""
     reserved_port: Optional[int] = None
     try:
         target_ida = get_ida_path()
@@ -232,7 +237,9 @@ def open_in_ida(
         configured_bundle_dir = _normalize_bundle_dir(get_open_in_ida_bundle_dir())
         bundle_dir = _launch_bundle_dir(configured_bundle_dir) if configured_bundle_dir else None
         cmd = [target_ida]
-        launch_args = [arg for arg in (extra_args or []) if isinstance(arg, str) and arg.strip()]
+        launch_args = [arg.strip() for arg in (extra_args or []) if isinstance(arg, str) and arg.strip()]
+        if get_open_in_ida_use_autonomous() and "-A" not in launch_args:
+            launch_args.insert(0, "-A")
         if configured_bundle_dir:
             assert bundle_dir is not None
             final_file_path, staged_file = _stage_target_file_for_launch(file_path, bundle_dir)

@@ -18,6 +18,7 @@ IDA 实例配置 (内部组件，地址固定为 127.0.0.1):
     - ida_default_port: IDA 实例 MCP 端口起始值 (默认 10000)
     - ida_path: IDA 可执行文件路径
     - open_in_ida_bundle_dir: open_in_ida staging 目录 (可选)
+    - open_in_ida_use_autonomous: open_in_ida 是否默认追加 -A (默认 true)
 
 通用配置:
     - request_timeout: 请求超时时间 (默认 30 秒)
@@ -51,6 +52,7 @@ _DEFAULT_CONFIG = {
     "ida_default_port": 10000,
     "ida_path": None, # IDA 可执行文件路径
     "open_in_ida_bundle_dir": None, # open_in_ida staging 目录
+    "open_in_ida_use_autonomous": True, # open_in_ida 是否默认追加 -A
     
     # 通用配置
     "request_timeout": 30,
@@ -265,6 +267,12 @@ def get_open_in_ida_bundle_dir() -> str | None:
         if configured_path:
             return configured_path
     return None
+
+
+def get_open_in_ida_use_autonomous() -> bool:
+    """获取 open_in_ida 是否默认使用 -A（batch/autonomous 模式）。"""
+    config = load_config()
+    return _coerce_bool(config.get("open_in_ida_use_autonomous", True), True)
 
 
 
