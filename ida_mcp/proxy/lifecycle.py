@@ -15,7 +15,6 @@ from ..config import (
     get_ida_default_port,
     get_ida_path,
     get_open_in_ida_bundle_dir,
-    get_open_in_ida_use_autonomous,
 )
 from ._state import forward, get_instances
 
@@ -221,6 +220,7 @@ def _use_direct_target_file(file_path: str) -> tuple[str, None]:
 def open_in_ida(
     file_path: str,
     extra_args: Optional[List[str]] = None,
+    autonomous: bool = True,
 ) -> dict:
     """Launch IDA and request plugin auto-start."""
     reserved_port: Optional[int] = None
@@ -237,8 +237,12 @@ def open_in_ida(
         configured_bundle_dir = _normalize_bundle_dir(get_open_in_ida_bundle_dir())
         bundle_dir = _launch_bundle_dir(configured_bundle_dir) if configured_bundle_dir else None
         cmd = [target_ida]
-        launch_args = [arg.strip() for arg in (extra_args or []) if isinstance(arg, str) and arg.strip()]
-        if get_open_in_ida_use_autonomous() and "-A" not in launch_args:
+        launch_args = [
+            arg.strip()
+            for arg in (extra_args or [])
+            if isinstance(arg, str) and arg.strip() and arg.strip() != "-A"
+        ]
+        if autonomous:
             launch_args.insert(0, "-A")
         if configured_bundle_dir:
             assert bundle_dir is not None

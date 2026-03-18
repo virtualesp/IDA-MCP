@@ -145,10 +145,14 @@ def call_tool(
     }
 
 
-def open_ida(file_path: str, extra_args: Optional[list[str]] = None) -> dict[str, Any]:
+def open_ida(
+    file_path: str,
+    extra_args: Optional[list[str]] = None,
+    autonomous: bool = True,
+) -> dict[str, Any]:
     from .proxy import lifecycle
 
-    result = lifecycle.open_in_ida(file_path, extra_args=extra_args)
+    result = lifecycle.open_in_ida(file_path, extra_args=extra_args, autonomous=autonomous)
     if "error" in result:
         return error_payload("ida_open_failed", str(result["error"]), file_path=file_path)
     return result

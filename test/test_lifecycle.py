@@ -133,13 +133,12 @@ class TestLifecycleErrors:
                 with patch("ida_mcp.proxy.lifecycle.get_ida_default_port", return_value=10000):
                     with patch("ida_mcp.proxy.lifecycle.get_instances", return_value=[]):
                         with patch("ida_mcp.proxy.lifecycle.get_open_in_ida_bundle_dir", return_value=launch_root):
-                            with patch("ida_mcp.proxy.lifecycle.get_open_in_ida_use_autonomous", return_value=False):
-                                with patch("ida_mcp.proxy.lifecycle._is_port_bindable", return_value=True):
-                                    with patch("ida_mcp.proxy.lifecycle._launch_bundle_dir", return_value=bundle_dir):
-                                        with patch("ida_mcp.proxy.lifecycle._stage_target_file_for_launch", return_value=(__file__, __file__)):
-                                            with patch("subprocess.Popen") as mock_popen:
-                                                first = lifecycle.open_in_ida(__file__)
-                                                second = lifecycle.open_in_ida(__file__)
+                            with patch("ida_mcp.proxy.lifecycle._is_port_bindable", return_value=True):
+                                with patch("ida_mcp.proxy.lifecycle._launch_bundle_dir", return_value=bundle_dir):
+                                    with patch("ida_mcp.proxy.lifecycle._stage_target_file_for_launch", return_value=(__file__, __file__)):
+                                        with patch("subprocess.Popen") as mock_popen:
+                                            first = lifecycle.open_in_ida(__file__, autonomous=False)
+                                            second = lifecycle.open_in_ida(__file__, autonomous=False)
 
         assert first["status"] == "ok"
         assert second["status"] == "ok"
@@ -161,20 +160,20 @@ class TestLifecycleErrors:
                 with patch("ida_mcp.proxy.lifecycle.get_ida_default_port", return_value=10000):
                     with patch("ida_mcp.proxy.lifecycle.get_instances", return_value=[]):
                         with patch("ida_mcp.proxy.lifecycle.get_open_in_ida_bundle_dir", return_value=launch_root):
-                            with patch("ida_mcp.proxy.lifecycle.get_open_in_ida_use_autonomous", return_value=False):
-                                with patch("ida_mcp.proxy.lifecycle._is_port_bindable", return_value=True):
-                                    with patch("ida_mcp.proxy.lifecycle._launch_bundle_dir", return_value=bundle_dir):
-                                        with patch("ida_mcp.proxy.lifecycle._stage_target_file_for_launch", return_value=(__file__, __file__)):
-                                            with patch("subprocess.Popen") as mock_popen:
-                                                result = lifecycle.open_in_ida(__file__, extra_args=["-A", "-Llog.txt"])
+                            with patch("ida_mcp.proxy.lifecycle._is_port_bindable", return_value=True):
+                                with patch("ida_mcp.proxy.lifecycle._launch_bundle_dir", return_value=bundle_dir):
+                                    with patch("ida_mcp.proxy.lifecycle._stage_target_file_for_launch", return_value=(__file__, __file__)):
+                                        with patch("subprocess.Popen") as mock_popen:
+                                            result = lifecycle.open_in_ida(__file__, extra_args=["-A", "-Llog.txt"], autonomous=True)
 
         assert result["status"] == "ok"
         cmd = mock_popen.call_args.args[0]
         assert "-A" in cmd
+        assert cmd.count("-A") == 1
         assert "-Llog.txt" in cmd
         assert mock_popen.call_args.kwargs["env"]["IDA_MCP_AUTO_START"] == "1"
 
-    def test_open_in_ida_adds_a_when_config_enabled(self):
+    def test_open_in_ida_adds_a_when_autonomous_enabled(self):
         launch_root = os.path.join(tempfile.gettempdir(), "ida-launch-root")
         bundle_dir = os.path.join(launch_root, "ida_mcp_open_20260317-120000-000001")
         with patch.dict(lifecycle._RESERVED_LAUNCH_PORTS, {}, clear=True):
@@ -182,12 +181,11 @@ class TestLifecycleErrors:
                 with patch("ida_mcp.proxy.lifecycle.get_ida_default_port", return_value=10000):
                     with patch("ida_mcp.proxy.lifecycle.get_instances", return_value=[]):
                         with patch("ida_mcp.proxy.lifecycle.get_open_in_ida_bundle_dir", return_value=launch_root):
-                            with patch("ida_mcp.proxy.lifecycle.get_open_in_ida_use_autonomous", return_value=True):
-                                with patch("ida_mcp.proxy.lifecycle._is_port_bindable", return_value=True):
-                                    with patch("ida_mcp.proxy.lifecycle._launch_bundle_dir", return_value=bundle_dir):
-                                        with patch("ida_mcp.proxy.lifecycle._stage_target_file_for_launch", return_value=(__file__, __file__)):
-                                            with patch("subprocess.Popen") as mock_popen:
-                                                result = lifecycle.open_in_ida(__file__, extra_args=["-Llog.txt"])
+                            with patch("ida_mcp.proxy.lifecycle._is_port_bindable", return_value=True):
+                                with patch("ida_mcp.proxy.lifecycle._launch_bundle_dir", return_value=bundle_dir):
+                                    with patch("ida_mcp.proxy.lifecycle._stage_target_file_for_launch", return_value=(__file__, __file__)):
+                                        with patch("subprocess.Popen") as mock_popen:
+                                            result = lifecycle.open_in_ida(__file__, extra_args=["-Llog.txt"], autonomous=True)
 
         assert result["status"] == "ok"
         cmd = mock_popen.call_args.args[0]
@@ -195,9 +193,24 @@ class TestLifecycleErrors:
         assert cmd.count("-A") == 1
         assert "-Llog.txt" in cmd
 
-    def test_get_open_in_ida_use_autonomous_reads_bool_from_config(self):
-        with patch("ida_mcp.config.load_config", return_value={"open_in_ida_use_autonomous": True}):
-            assert config.get_open_in_ida_use_autonomous() is True
+    def test_open_in_ida_omits_a_when_autonomous_disabled(self):
+        launch_root = os.path.join(tempfile.gettempdir(), "ida-launch-root")
+        bundle_dir = os.path.join(launch_root, "ida_mcp_open_20260317-120000-000001")
+        with patch.dict(lifecycle._RESERVED_LAUNCH_PORTS, {}, clear=True):
+            with patch("ida_mcp.proxy.lifecycle.get_ida_path", return_value=sys.executable):
+                with patch("ida_mcp.proxy.lifecycle.get_ida_default_port", return_value=10000):
+                    with patch("ida_mcp.proxy.lifecycle.get_instances", return_value=[]):
+                        with patch("ida_mcp.proxy.lifecycle.get_open_in_ida_bundle_dir", return_value=launch_root):
+                            with patch("ida_mcp.proxy.lifecycle._is_port_bindable", return_value=True):
+                                with patch("ida_mcp.proxy.lifecycle._launch_bundle_dir", return_value=bundle_dir):
+                                    with patch("ida_mcp.proxy.lifecycle._stage_target_file_for_launch", return_value=(__file__, __file__)):
+                                        with patch("subprocess.Popen") as mock_popen:
+                                            result = lifecycle.open_in_ida(__file__, extra_args=["-Llog.txt"], autonomous=False)
+
+        assert result["status"] == "ok"
+        cmd = mock_popen.call_args.args[0]
+        assert "-A" not in cmd
+        assert "-Llog.txt" in cmd
 
     def test_resolve_launch_inputs_prefers_existing_database(self, tmp_path):
         sample = tmp_path / "sample.exe"
@@ -237,12 +250,11 @@ class TestLifecycleErrors:
                 with patch("ida_mcp.proxy.lifecycle.get_ida_default_port", return_value=10000):
                     with patch("ida_mcp.proxy.lifecycle.get_instances", return_value=[]):
                         with patch("ida_mcp.proxy.lifecycle.get_open_in_ida_bundle_dir", return_value=bundle_root):
-                            with patch("ida_mcp.proxy.lifecycle.get_open_in_ida_use_autonomous", return_value=False):
-                                with patch("ida_mcp.proxy.lifecycle._is_port_bindable", return_value=True):
-                                    with patch("ida_mcp.proxy.lifecycle._launch_bundle_dir", return_value=bundle_dir) as mock_launch_bundle:
-                                        with patch("ida_mcp.proxy.lifecycle._stage_target_file_for_launch", return_value=(staged_file, staged_file)) as mock_stage:
-                                            with patch("subprocess.Popen") as mock_popen:
-                                                result = lifecycle.open_in_ida(__file__)
+                            with patch("ida_mcp.proxy.lifecycle._is_port_bindable", return_value=True):
+                                with patch("ida_mcp.proxy.lifecycle._launch_bundle_dir", return_value=bundle_dir) as mock_launch_bundle:
+                                    with patch("ida_mcp.proxy.lifecycle._stage_target_file_for_launch", return_value=(staged_file, staged_file)) as mock_stage:
+                                        with patch("subprocess.Popen") as mock_popen:
+                                            result = lifecycle.open_in_ida(__file__, autonomous=False)
 
         mock_launch_bundle.assert_called_once_with(bundle_root)
         mock_stage.assert_called_once_with(__file__, bundle_dir)
@@ -258,11 +270,10 @@ class TestLifecycleErrors:
                 with patch("ida_mcp.proxy.lifecycle.get_ida_default_port", return_value=10000):
                     with patch("ida_mcp.proxy.lifecycle.get_instances", return_value=[]):
                         with patch("ida_mcp.proxy.lifecycle.get_open_in_ida_bundle_dir", return_value=None):
-                            with patch("ida_mcp.proxy.lifecycle.get_open_in_ida_use_autonomous", return_value=False):
-                                with patch("ida_mcp.proxy.lifecycle._is_port_bindable", return_value=True):
-                                    with patch("ida_mcp.proxy.lifecycle._use_direct_target_file", return_value=(direct_target, None)) as mock_direct:
-                                        with patch("subprocess.Popen") as mock_popen:
-                                            result = lifecycle.open_in_ida(__file__)
+                            with patch("ida_mcp.proxy.lifecycle._is_port_bindable", return_value=True):
+                                with patch("ida_mcp.proxy.lifecycle._use_direct_target_file", return_value=(direct_target, None)) as mock_direct:
+                                    with patch("subprocess.Popen") as mock_popen:
+                                        result = lifecycle.open_in_ida(__file__, autonomous=False)
 
         mock_direct.assert_called_once_with(__file__)
         assert result["launch_bundle"] is None
@@ -304,11 +315,10 @@ class TestLifecycleErrors:
                 with patch("ida_mcp.proxy.lifecycle.get_ida_default_port", return_value=10000):
                     with patch("ida_mcp.proxy.lifecycle.get_instances", return_value=[]):
                         with patch("ida_mcp.proxy.lifecycle.get_open_in_ida_bundle_dir", return_value=None):
-                            with patch("ida_mcp.proxy.lifecycle.get_open_in_ida_use_autonomous", return_value=False):
-                                with patch("ida_mcp.proxy.lifecycle._is_port_bindable", return_value=True):
-                                    with patch("ida_mcp.proxy.lifecycle._use_direct_target_file", return_value=(__file__, None)):
-                                        with patch("subprocess.Popen", side_effect=RuntimeError("boom")):
-                                            result = lifecycle.open_in_ida(__file__)
+                            with patch("ida_mcp.proxy.lifecycle._is_port_bindable", return_value=True):
+                                with patch("ida_mcp.proxy.lifecycle._use_direct_target_file", return_value=(__file__, None)):
+                                    with patch("subprocess.Popen", side_effect=RuntimeError("boom")):
+                                        result = lifecycle.open_in_ida(__file__, autonomous=False)
             assert lifecycle._RESERVED_LAUNCH_PORTS == {}
 
         assert "error" in result

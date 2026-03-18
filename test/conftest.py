@@ -168,6 +168,7 @@ def _call_proxy_only_tool_locally(tool_name: str, params: dict) -> Any:
         return lifecycle.open_in_ida(
             params.get("file_path", ""),
             extra_args=params.get("extra_args"),
+            autonomous=bool(params.get("autonomous", True)),
         )
 
     return {"error": f"Unsupported proxy-only tool: {tool_name}"}

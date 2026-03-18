@@ -218,11 +218,17 @@ IDA-MCP/
 
 Closing an IDA instance only deregisters that instance. The standalone gateway keeps running and can accept later instances.
 
-`open_in_ida` is a proxy-side lifecycle tool. It launches the IDA binary resolved from `IDA_PATH` or `config.conf` (`ida_path`), and requests plugin auto-start by setting `IDA_MCP_AUTO_START=1` and a reserved `IDA_MCP_PORT` in the child process environment. By default it prepends `-A`. If `extra_args` already contains `-A`, it is not duplicated.
+`open_in_ida` is a proxy-side lifecycle tool. It launches the IDA binary resolved from `IDA_PATH` or `config.conf` (`ida_path`), and requests plugin auto-start by setting `IDA_MCP_AUTO_START=1` and a reserved `IDA_MCP_PORT` in the child process environment. It now accepts an explicit `autonomous` parameter. `autonomous=true` adds `-A` and `autonomous=false` launches without `-A`. The default is `true`.
 
 `open_in_ida` uses `IDA_PATH` / `config.conf` to resolve the IDA executable. File staging is optional: when `IDA_MCP_BUNDLE_DIR` or `open_in_ida_bundle_dir` is configured, `open_in_ida` creates a timestamped launch directory under that root and copies the requested file there before launch. If a matching `.i64` or `.idb` already exists, it copies that database too and launches the database path directly so IDA can enter the existing workspace without showing the loader/options confirmation dialog again. When staging is not configured, `open_in_ida` launches the original path directly and still prefers an existing matching database when present.
 
-With the default `open_in_ida_use_autonomous=true`, IDA starts in batch/autonomous mode. That is useful for unattended automation and can reduce some interactive confirmation flows, but it is not the same as a normal manual reverse-engineering session: interactive dialogs may be suppressed, loader/plugin/UI behaviors that expect manual confirmation can differ. If you want normal GUI-first startup behavior, set `open_in_ida_use_autonomous=false`.
+With the default `autonomous=true`, IDA starts in batch/autonomous mode. That is useful for unattended automation and can reduce some interactive confirmation flows, but it is not the same as a normal manual reverse-engineering session: interactive dialogs may be suppressed, loader/plugin/UI behaviors that expect manual confirmation can differ.
+
+If you want to combine automation with later manual work, use a two-stage flow:
+
+1. Call `open_in_ida(..., autonomous=true)` to let IDA run the automated phase.
+2. Save the generated `.i64/.idb`.
+3. Reopen that database with `open_in_ida(..., autonomous=false)` for normal manual interaction.
 
 If you use WSL as the control side, these are README-only operational recommendations. IDA-MCP does not read them. Recommended Windows-side `%UserProfile%\\.wslconfig`:
 
@@ -303,8 +309,6 @@ enable_unsafe = true
 # ida_default_port = 10000
 # ida_path = "C:\\Path\\To\\ida.exe"
 # open_in_ida_bundle_dir = "D:\\Temp\\ida-mcp"
-# open_in_ida_use_autonomous = true
-
 # General settings
 # request_timeout = 30
 # debug = false
@@ -318,8 +322,9 @@ Notes:
 * `IDA_MCP_ENABLE_UNSAFE=1|0` overrides `enable_unsafe` from `config.conf`.
 * `open_in_ida` no longer accepts an `ida_path` tool argument; configure the IDA executable through `IDA_PATH` or `config.conf`.
 * `open_in_ida` sets `IDA_MCP_AUTO_START=1` and `IDA_MCP_PORT=<reserved_port>` for the launched IDA process.
-* `open_in_ida_use_autonomous` defaults to `true`, so `open_in_ida` prepends `-A` unless `extra_args` already contains it.
-* `-A` switches IDA into batch/autonomous startup mode. If you want normal interactive GUI reversing behavior by default, set `open_in_ida_use_autonomous=false`.
+* `open_in_ida` now takes an `autonomous` parameter; it is not configured through `config.conf`.
+* `autonomous` defaults to `true`, so `open_in_ida` adds `-A` unless you call it with `autonomous=false`.
+* `-A` switches IDA into batch/autonomous startup mode. For the "automate first, inspect later" workflow, save the `.i64/.idb` and reopen it with `autonomous=false`.
 * With `-A`, confirmation dialogs and some loader/plugin/UI flows can be suppressed or behave differently from normal GUI startup.
 * `open_in_ida` only stages files when `IDA_MCP_BUNDLE_DIR` or `open_in_ida_bundle_dir` is configured.
 * When staging is enabled, `open_in_ida` creates `.../<timestamp>/`, copies the requested file, and also copies a matching `.i64`/`.idb` when one exists.
@@ -447,6 +452,7 @@ python command.py gateway restart
 python command.py gateway status
 python command.py ida list
 python command.py ida open ./test/samples/simple.exe
+python command.py ida open ./test/samples/simple.exe --interactive
 python command.py ida select --port 10000
 python command.py tool call get_metadata --port 10000
 python command.py resource read ida://functions --port 10000
