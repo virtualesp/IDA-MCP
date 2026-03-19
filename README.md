@@ -308,7 +308,9 @@ enable_unsafe = true
 # ida_default_port = 10000
 # ida_path = "C:\\Path\\To\\ida.exe"
 # open_in_ida_bundle_dir = "D:\\Temp\\ida-mcp"
+
 # General settings
+# gateway_python = "C:\\Path\\To\\python.exe"
 # request_timeout = 30
 # debug = false
 ```
@@ -317,9 +319,11 @@ Notes:
 
 * The gateway host and direct instance host are fixed to `127.0.0.1` for client connections in code.
 * `IDA_PATH` overrides `ida_path` from `config.conf`.
+* `IDA_MCP_PYTHON` overrides `gateway_python` from `config.conf`.
 * `IDA_MCP_BUNDLE_DIR` overrides `open_in_ida_bundle_dir` from `config.conf`.
 * `IDA_MCP_ENABLE_UNSAFE=1|0` overrides `enable_unsafe` from `config.conf`.
 * `IDA_MCP_WSL_PATH_BRIDGE=1|0` overrides `wsl_path_bridge` from `config.conf`.
+* `gateway_python` is used for the standalone gateway/proxy subprocess. `install.py` auto-detects the IDA-side Python and writes it into this field.
 * `open_in_ida` no longer accepts an `ida_path` tool argument; configure the IDA executable through `IDA_PATH` or `config.conf`.
 * `open_in_ida` sets `IDA_MCP_AUTO_START=1` and `IDA_MCP_PORT=<reserved_port>` for the launched IDA process.
 * `open_in_ida` now takes an `autonomous` parameter; it is not configured through `config.conf`.

@@ -229,6 +229,11 @@ class TestLifecycleErrors:
             with patch("ida_mcp.config.load_config", return_value={"open_in_ida_bundle_dir": r"E:\config-temp"}):
                 assert config.get_open_in_ida_bundle_dir() == r"D:\env-temp"
 
+    def test_get_gateway_python_prefers_env_over_config(self):
+        with patch.dict(os.environ, {"IDA_MCP_PYTHON": r"D:\env-python\python.exe"}, clear=False):
+            with patch("ida_mcp.config.load_config", return_value={"gateway_python": r"E:\config-python\python.exe"}):
+                assert config.get_gateway_python() == r"D:\env-python\python.exe"
+
     def test_is_wsl_path_bridge_enabled_prefers_env_over_config(self):
         with patch.dict(os.environ, {"IDA_MCP_WSL_PATH_BRIDGE": "1"}, clear=False):
             with patch("ida_mcp.config.load_config", return_value={"wsl_path_bridge": False}):
@@ -572,6 +577,35 @@ class TestRegistryStartup:
                     resolved = registry._resolve_python_executable()
 
         assert resolved.lower() == r"d:\safetools\idapro-9.3\python.exe"
+
+    def test_resolve_python_executable_prefers_configured_gateway_python(self):
+        """显式配置 gateway_python 时，应优先使用该解释器。"""
+        configured = r"D:\portable-python-3.11\python.exe"
+
+        with patch("ida_mcp.registry.get_gateway_python", return_value=configured):
+            with patch("os.path.isfile", side_effect=lambda p: p.lower() == configured.lower()):
+                resolved = registry._resolve_python_executable()
+
+        assert resolved == configured
+
+    def test_resolve_python_executable_uses_sys_prefix_python(self):
+        """嵌入式环境下应尝试 sys.prefix 旁边的 python.exe。"""
+        embedded_exe = r"D:\safetools\IDAPro-9.3\ida64.exe"
+        embedded_prefix = r"D:\portable-python-3.11"
+
+        with patch("ida_mcp.registry.get_gateway_python", return_value=None):
+            with patch.object(sys, "executable", embedded_exe):
+                with patch.object(sys, "_base_executable", embedded_exe, create=True):
+                    with patch.object(sys, "prefix", embedded_prefix):
+                        with patch.object(sys, "base_prefix", embedded_prefix):
+                            with patch.object(sys, "exec_prefix", embedded_prefix):
+                                with patch(
+                                    "os.path.isfile",
+                                    side_effect=lambda p: p.lower() == r"d:\portable-python-3.11\python.exe",
+                                ):
+                                    resolved = registry._resolve_python_executable()
+
+        assert resolved.lower() == r"d:\portable-python-3.11\python.exe"
 
     def test_ensure_http_proxy_running_uses_gateway_process(self):
         """HTTP proxy 应由已启动的网关进程内建拉起，而不是另起独立进程。"""

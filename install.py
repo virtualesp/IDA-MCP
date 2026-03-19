@@ -367,6 +367,7 @@ def render_config(config: dict[str, object]) -> str:
             f"open_in_ida_bundle_dir = {quote_config_value(config['open_in_ida_bundle_dir'])}",
             "",
             "# General settings",
+            f"gateway_python = {quote_config_value(config['gateway_python'])}",
             f"request_timeout = {quote_config_value(config['request_timeout'])}",
             f"debug = {quote_config_value(config['debug'])}",
             "",
@@ -374,7 +375,7 @@ def render_config(config: dict[str, object]) -> str:
     )
 
 
-def build_config_interactively(defaults: dict[str, object], ida_executable: Path) -> dict[str, object]:
+def build_config_interactively(defaults: dict[str, object], ida_executable: Path, ida_python: Path) -> dict[str, object]:
     config = {
         "enable_stdio": bool(defaults.get("enable_stdio", False)),
         "enable_http": bool(defaults.get("enable_http", True)),
@@ -386,6 +387,7 @@ def build_config_interactively(defaults: dict[str, object], ida_executable: Path
         "ida_default_port": int(defaults.get("ida_default_port", 10000)),
         "ida_path": str(ida_executable),
         "open_in_ida_bundle_dir": str(defaults.get("open_in_ida_bundle_dir") or ""),
+        "gateway_python": str(defaults.get("gateway_python") or ida_python),
         "request_timeout": int(defaults.get("request_timeout", 30)),
         "debug": bool(defaults.get("debug", False)),
     }
@@ -416,6 +418,10 @@ def build_config_interactively(defaults: dict[str, object], ida_executable: Path
         ),
         str(config["open_in_ida_bundle_dir"]),
     )
+    config["gateway_python"] = prompt_existing_file(
+        "Gateway Python executable for standalone gateway/proxy",
+        str(config["gateway_python"]),
+    )
     config["request_timeout"] = prompt_int("Request timeout (seconds)", int(config["request_timeout"]))
     config["debug"] = prompt_bool("Enable debug logging", bool(config["debug"]))
 
@@ -444,6 +450,7 @@ def print_summary(
     print(f"  gateway bind   : {config['http_host']}:{config['http_port']}{config['http_path']}")
     print(f"  ida_default_port: {config['ida_default_port']}")
     print(f"  open_in_ida bundle dir: {config['open_in_ida_bundle_dir'] or '(direct source path)'}")
+    print(f"  gateway Python : {config['gateway_python']}")
     print(f"  request_timeout: {config['request_timeout']}")
     print(f"  debug          : {config['debug']}")
 
@@ -484,7 +491,7 @@ def main() -> int:
         "IDA Python executable",
         platform_name,
     )
-    config = build_config_interactively(defaults, ida_executable)
+    config = build_config_interactively(defaults, ida_executable, ida_python)
     print_summary(ida_executable, ida_python, plugins_dir, config)
 
     if not prompt_bool("Continue with installation", True):

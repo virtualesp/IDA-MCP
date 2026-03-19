@@ -21,6 +21,7 @@ IDA 实例配置 (内部组件，地址固定为 127.0.0.1):
     - open_in_ida_bundle_dir: open_in_ida staging 目录 (可选)
 
 通用配置:
+    - gateway_python: 独立 gateway/proxy 子进程使用的 Python (可选)
     - request_timeout: 请求超时时间 (默认 30 秒)
     - debug: 是否启用调试日志 (默认 false)
 """
@@ -50,8 +51,9 @@ _DEFAULT_CONFIG = {
     "ida_default_port": 10000,
     "ida_path": None, # IDA 可执行文件路径
     "open_in_ida_bundle_dir": None, # open_in_ida staging 目录
-    
+
     # 通用配置
+    "gateway_python": None, # 独立 gateway/proxy 子进程使用的 Python
     "request_timeout": 30,
     "debug": False,
 }
@@ -259,6 +261,27 @@ def get_open_in_ida_bundle_dir() -> str | None:
 
     config = load_config()
     configured_path = config.get("open_in_ida_bundle_dir")
+    if isinstance(configured_path, str):
+        configured_path = configured_path.strip()
+        if configured_path:
+            return configured_path
+    return None
+
+
+def get_gateway_python() -> str | None:
+    """获取独立 gateway/proxy 子进程使用的 Python。
+
+    优先级:
+    1. 环境变量 IDA_MCP_PYTHON
+    2. 配置文件中的 gateway_python
+    3. None（交给自动探测）
+    """
+    env_path = os.getenv("IDA_MCP_PYTHON")
+    if env_path and env_path.strip():
+        return env_path.strip()
+
+    config = load_config()
+    configured_path = config.get("gateway_python")
     if isinstance(configured_path, str):
         configured_path = configured_path.strip()
         if configured_path:
