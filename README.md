@@ -297,6 +297,7 @@ Edit `ida_mcp/config.conf` to customize settings:
 enable_stdio = false
 enable_http = true
 enable_unsafe = true
+# wsl_path_bridge = false
 
 # coordinator_port = 11337  # legacy compatibility key; internal API now shares http_port
 
@@ -320,6 +321,7 @@ Notes:
 * `IDA_PATH` overrides `ida_path` from `config.conf`.
 * `IDA_MCP_BUNDLE_DIR` overrides `open_in_ida_bundle_dir` from `config.conf`.
 * `IDA_MCP_ENABLE_UNSAFE=1|0` overrides `enable_unsafe` from `config.conf`.
+* `IDA_MCP_WSL_PATH_BRIDGE=1|0` overrides `wsl_path_bridge` from `config.conf`.
 * `open_in_ida` no longer accepts an `ida_path` tool argument; configure the IDA executable through `IDA_PATH` or `config.conf`.
 * `open_in_ida` sets `IDA_MCP_AUTO_START=1` and `IDA_MCP_PORT=<reserved_port>` for the launched IDA process.
 * `open_in_ida` now takes an `autonomous` parameter; it is not configured through `config.conf`.
@@ -330,6 +332,10 @@ Notes:
 * When staging is enabled, `open_in_ida` creates `.../<timestamp>/`, copies the requested file, and also copies a matching `.i64`/`.idb` when one exists.
 * When a matching `.i64`/`.idb` exists, `open_in_ida` launches that database path directly to avoid the initial loader/options confirmation flow.
 * When staging is not enabled, `open_in_ida` launches the original path directly.
+* `wsl_path_bridge` is disabled by default. Enable it only when the LLM/client works inside WSL while IDA/Python stay on the Windows host.
+* When `wsl_path_bridge` is enabled, configure both `ida_path` and `open_in_ida_bundle_dir` as **host Windows paths**.
+* With `wsl_path_bridge` enabled, `open_in_ida` converts convertible WSL mount paths such as `/mnt/e/...` into host Windows paths before launching IDA.
+* If `wsl_path_bridge` is enabled and the final launch target cannot be translated into a Windows path, `open_in_ida` returns an error. In that case, configure `open_in_ida_bundle_dir` so the file is staged onto a Windows drive first.
 * If both `enable_stdio` and `enable_http` are disabled, the plugin will not start the gateway/transport stack.
 
 ### Method 1: HTTP Proxy Mode (Recommended)

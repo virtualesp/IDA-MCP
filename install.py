@@ -354,6 +354,7 @@ def render_config(config: dict[str, object]) -> str:
             f"enable_stdio = {quote_config_value(config['enable_stdio'])}",
             f"enable_http = {quote_config_value(config['enable_http'])}",
             f"enable_unsafe = {quote_config_value(config['enable_unsafe'])}",
+            f"wsl_path_bridge = {quote_config_value(config['wsl_path_bridge'])}",
             "",
             "# HTTP gateway settings (single-port gateway)",
             f"http_host = {quote_config_value(config['http_host'])}",
@@ -378,6 +379,7 @@ def build_config_interactively(defaults: dict[str, object], ida_executable: Path
         "enable_stdio": bool(defaults.get("enable_stdio", False)),
         "enable_http": bool(defaults.get("enable_http", True)),
         "enable_unsafe": bool(defaults.get("enable_unsafe", True)),
+        "wsl_path_bridge": bool(defaults.get("wsl_path_bridge", False)),
         "http_host": str(defaults.get("http_host", "127.0.0.1")),
         "http_port": int(defaults.get("http_port", 11338)),
         "http_path": str(defaults.get("http_path", "/mcp")),
@@ -392,6 +394,10 @@ def build_config_interactively(defaults: dict[str, object], ida_executable: Path
     config["enable_http"] = prompt_bool("Enable HTTP gateway mode", bool(config["enable_http"]))
     config["enable_stdio"] = prompt_bool("Enable stdio mode", bool(config["enable_stdio"]))
     config["enable_unsafe"] = prompt_bool("Enable unsafe tools", bool(config["enable_unsafe"]))
+    config["wsl_path_bridge"] = prompt_bool(
+        "Enable WSL path bridge (client/LLM in WSL, IDA/Python on Windows host)",
+        bool(config["wsl_path_bridge"]),
+    )
     config["http_host"] = prompt("HTTP gateway bind host", str(config["http_host"]))
     config["http_port"] = prompt_int("HTTP gateway port", int(config["http_port"]))
     config["http_path"] = prompt("HTTP gateway MCP path", str(config["http_path"]))
@@ -404,7 +410,10 @@ def build_config_interactively(defaults: dict[str, object], ida_executable: Path
         str(config["ida_path"]),
     )
     config["open_in_ida_bundle_dir"] = prompt(
-        "open_in_ida bundle dir (optional; leave empty to open the original path directly)",
+        (
+            "open_in_ida bundle dir "
+            "(optional; leave empty to open the original path directly; when WSL bridge is enabled, enter a host Windows path)"
+        ),
         str(config["open_in_ida_bundle_dir"]),
     )
     config["request_timeout"] = prompt_int("Request timeout (seconds)", int(config["request_timeout"]))
@@ -431,6 +440,7 @@ def print_summary(
     print(f"  enable_http    : {config['enable_http']}")
     print(f"  enable_stdio   : {config['enable_stdio']}")
     print(f"  enable_unsafe  : {config['enable_unsafe']}")
+    print(f"  wsl_path_bridge: {config['wsl_path_bridge']}")
     print(f"  gateway bind   : {config['http_host']}:{config['http_port']}{config['http_path']}")
     print(f"  ida_default_port: {config['ida_default_port']}")
     print(f"  open_in_ida bundle dir: {config['open_in_ida_bundle_dir'] or '(direct source path)'}")

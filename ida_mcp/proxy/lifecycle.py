@@ -15,6 +15,7 @@ from ..config import (
     get_ida_default_port,
     get_ida_path,
     get_open_in_ida_bundle_dir,
+    is_wsl_path_bridge_enabled,
 )
 from ._state import forward, get_instances
 
@@ -24,6 +25,76 @@ _RESERVED_LAUNCH_PORTS_LOCK = threading.Lock()
 _PORT_RESERVATION_TTL_SECONDS = 180.0
 _PORT_SCAN_LIMIT = 512
 _LAUNCH_BUNDLE_ROOT = "ida_mcp_open"
+
+
+def _looks_like_windows_drive_path(path: str) -> bool:
+    candidate = str(path).strip()
+    return len(candidate) >= 3 and candidate[0].isalpha() and candidate[1] == ":" and candidate[2] in {"\\", "/"}
+
+
+def _looks_like_wsl_mount_path(path: str) -> bool:
+    candidate = str(path).strip().replace("\\", "/")
+    return (
+        candidate.startswith("/mnt/")
+        and len(candidate) >= 6
+        and candidate[5].isalpha()
+        and (len(candidate) == 6 or candidate[6] == "/")
+    )
+
+
+def _windows_to_wsl_path(path: str) -> Optional[str]:
+    candidate = str(path).strip()
+    if not _looks_like_windows_drive_path(candidate):
+        return None
+
+    drive = candidate[0].lower()
+    tail = candidate[2:].replace("\\", "/")
+    tail = tail.lstrip("/")
+    if not tail:
+        return f"/mnt/{drive}"
+    return f"/mnt/{drive}/{tail}"
+
+
+def _wsl_to_windows_path(path: str) -> Optional[str]:
+    candidate = str(path).strip().replace("\\", "/")
+    if not _looks_like_wsl_mount_path(candidate):
+        return None
+
+    drive = candidate[5].upper()
+    tail = candidate[7:] if len(candidate) > 7 else ""
+    if not tail:
+        return f"{drive}:\\"
+    return f"{drive}:\\{tail.replace('/', '\\')}"
+
+
+def _local_fs_path(path: Optional[str]) -> Optional[str]:
+    if path is None:
+        return None
+
+    candidate = str(path).strip()
+    if not candidate or not is_wsl_path_bridge_enabled():
+        return candidate
+
+    if os.name == "nt":
+        return _wsl_to_windows_path(candidate) or candidate
+
+    return _windows_to_wsl_path(candidate) or candidate
+
+
+def _host_launch_path(path: Optional[str]) -> Optional[str]:
+    if path is None:
+        return None
+
+    candidate = str(path).strip()
+    if not candidate or not is_wsl_path_bridge_enabled():
+        return candidate
+
+    return _wsl_to_windows_path(candidate) or candidate
+
+
+def _is_host_windows_path(path: Optional[str]) -> bool:
+    candidate = _host_launch_path(path)
+    return bool(candidate and _looks_like_windows_drive_path(candidate))
 
 
 def _cleanup_reserved_launch_ports(now: Optional[float] = None) -> None:
@@ -228,15 +299,18 @@ def open_in_ida(
         target_ida = get_ida_path()
         if not target_ida:
             return {"error": "IDA path not configured. Please set IDA_PATH environment variable or 'ida_path' in config.conf."}
-        if not os.path.exists(target_ida):
+        local_target_ida = _local_fs_path(target_ida)
+        if not local_target_ida or not os.path.exists(local_target_ida):
             return {"error": f"IDA executable not found at: {target_ida}"}
-        if not os.path.exists(file_path):
+
+        local_file_path = _local_fs_path(file_path)
+        if not local_file_path or not os.path.exists(local_file_path):
             return {"error": f"File not found: {file_path}"}
 
         reserved_port = _reserve_launch_port()
-        configured_bundle_dir = _normalize_bundle_dir(get_open_in_ida_bundle_dir())
+        configured_bundle_dir = _normalize_bundle_dir(_local_fs_path(get_open_in_ida_bundle_dir()))
         bundle_dir = _launch_bundle_dir(configured_bundle_dir) if configured_bundle_dir else None
-        cmd = [target_ida]
+        cmd = [local_target_ida]
         launch_args = [
             arg.strip()
             for arg in (extra_args or [])
@@ -246,17 +320,27 @@ def open_in_ida(
             launch_args.insert(0, "-A")
         if configured_bundle_dir:
             assert bundle_dir is not None
-            final_file_path, staged_file = _stage_target_file_for_launch(file_path, bundle_dir)
+            final_file_path, staged_file = _stage_target_file_for_launch(local_file_path, bundle_dir)
         else:
-            final_file_path, staged_file = _use_direct_target_file(file_path)
+            final_file_path, staged_file = _use_direct_target_file(local_file_path)
+        launch_file_path = _host_launch_path(final_file_path)
+        reported_bundle_dir = _host_launch_path(bundle_dir)
+        reported_staged_file = _host_launch_path(staged_file)
+        if is_wsl_path_bridge_enabled() and not _is_host_windows_path(launch_file_path):
+            return {
+                "error": (
+                    "WSL path bridge is enabled, but the launch target cannot be translated to a Windows path. "
+                    "Configure 'open_in_ida_bundle_dir' on a Windows drive or pass a Windows-accessible file path."
+                )
+            }
         if launch_args:
             cmd.extend(launch_args)
-        cmd.append(final_file_path)
+        cmd.append(launch_file_path)
 
         env = os.environ.copy()
         env["IDA_MCP_PORT"] = str(reserved_port)
         env["IDA_MCP_AUTO_START"] = "1"
-        cwd = os.path.dirname(target_ida) or None
+        cwd = os.path.dirname(local_target_ida) or None
         try:
             subprocess.Popen(cmd, cwd=cwd, env=env, close_fds=True if sys.platform != "win32" else False)
         except Exception:
@@ -266,9 +350,9 @@ def open_in_ida(
             "status": "ok",
             "message": f"Launched IDA with preferred MCP port {reserved_port}: {' '.join(cmd)}",
             "requested_port": reserved_port,
-            "launch_bundle": bundle_dir,
-            "staged_file": staged_file,
-            "launch_target": final_file_path,
+            "launch_bundle": reported_bundle_dir,
+            "staged_file": reported_staged_file,
+            "launch_target": launch_file_path,
         }
     except Exception as e:
         _release_launch_port(reserved_port)

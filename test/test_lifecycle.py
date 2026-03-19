@@ -229,6 +229,15 @@ class TestLifecycleErrors:
             with patch("ida_mcp.config.load_config", return_value={"open_in_ida_bundle_dir": r"E:\config-temp"}):
                 assert config.get_open_in_ida_bundle_dir() == r"D:\env-temp"
 
+    def test_is_wsl_path_bridge_enabled_prefers_env_over_config(self):
+        with patch.dict(os.environ, {"IDA_MCP_WSL_PATH_BRIDGE": "1"}, clear=False):
+            with patch("ida_mcp.config.load_config", return_value={"wsl_path_bridge": False}):
+                assert config.is_wsl_path_bridge_enabled() is True
+
+    def test_wsl_bridge_path_helpers_convert_windows_and_mount_paths(self):
+        assert lifecycle._windows_to_wsl_path(r"D:\ida-mcp\sample.exe") == "/mnt/d/ida-mcp/sample.exe"
+        assert lifecycle._wsl_to_windows_path("/mnt/d/ida-mcp/sample.exe") == r"D:\ida-mcp\sample.exe"
+
     def test_launch_bundle_dir_uses_timestamp_directory(self, tmp_path):
         root_dir = str(tmp_path)
         with patch("ida_mcp.proxy.lifecycle._timestamp_dir_name", return_value="ida_mcp_open_20260317-120000-000001"):
@@ -322,6 +331,69 @@ class TestLifecycleErrors:
             assert lifecycle._RESERVED_LAUNCH_PORTS == {}
 
         assert "error" in result
+
+    def test_open_in_ida_bridge_reports_host_windows_paths_when_staging(self):
+        host_target_ida = r"D:\safetools\IDAPro-9.3\ida.exe"
+        host_bundle_root = r"E:\ida-mcp"
+        host_source_file = r"E:\inputs\sample.exe"
+        local_target_ida = host_target_ida if os.name == "nt" else "/mnt/d/safetools/IDAPro-9.3/ida.exe"
+        local_bundle_root = host_bundle_root if os.name == "nt" else "/mnt/e/ida-mcp"
+        local_source_file = host_source_file if os.name == "nt" else "/mnt/e/inputs/sample.exe"
+        local_bundle_dir = os.path.join(local_bundle_root, "ida_mcp_open_20260317-120000-000001")
+        local_staged_file = os.path.join(local_bundle_dir, "sample.exe")
+        host_bundle_dir = r"E:\ida-mcp\ida_mcp_open_20260317-120000-000001"
+        host_staged_file = r"E:\ida-mcp\ida_mcp_open_20260317-120000-000001\sample.exe"
+
+        def _fake_exists(path):
+            return path in {local_target_ida, local_source_file}
+
+        with patch.dict(lifecycle._RESERVED_LAUNCH_PORTS, {}, clear=True):
+            with patch("ida_mcp.proxy.lifecycle.is_wsl_path_bridge_enabled", return_value=True):
+                with patch("ida_mcp.proxy.lifecycle.get_ida_path", return_value=host_target_ida):
+                    with patch("ida_mcp.proxy.lifecycle.get_ida_default_port", return_value=10000):
+                        with patch("ida_mcp.proxy.lifecycle.get_instances", return_value=[]):
+                            with patch("ida_mcp.proxy.lifecycle.get_open_in_ida_bundle_dir", return_value=host_bundle_root):
+                                with patch("ida_mcp.proxy.lifecycle.os.path.exists", side_effect=_fake_exists):
+                                    with patch("ida_mcp.proxy.lifecycle._is_port_bindable", return_value=True):
+                                        with patch("ida_mcp.proxy.lifecycle._normalize_bundle_dir", return_value=local_bundle_root) as mock_normalize:
+                                            with patch("ida_mcp.proxy.lifecycle._launch_bundle_dir", return_value=local_bundle_dir) as mock_launch_bundle:
+                                                with patch("ida_mcp.proxy.lifecycle._stage_target_file_for_launch", return_value=(local_staged_file, local_staged_file)) as mock_stage:
+                                                    with patch("subprocess.Popen") as mock_popen:
+                                                        result = lifecycle.open_in_ida(host_source_file, autonomous=False)
+
+        mock_normalize.assert_called_once_with(local_bundle_root)
+        mock_launch_bundle.assert_called_once_with(local_bundle_root)
+        mock_stage.assert_called_once_with(local_source_file, local_bundle_dir)
+        assert result["launch_bundle"] == host_bundle_dir
+        assert result["staged_file"] == host_staged_file
+        assert result["launch_target"] == host_staged_file
+        cmd = mock_popen.call_args.args[0]
+        assert cmd[0] == local_target_ida
+        assert cmd[-1] == host_staged_file
+
+    def test_open_in_ida_bridge_rejects_non_windows_launch_target_without_staging(self):
+        host_target_ida = r"D:\safetools\IDAPro-9.3\ida.exe"
+        source_file = "/opt/ida-mcp/sample.exe"
+        local_target_ida = host_target_ida if os.name == "nt" else "/mnt/d/safetools/IDAPro-9.3/ida.exe"
+
+        def _fake_exists(path):
+            return path in {local_target_ida, source_file}
+
+        with patch.dict(lifecycle._RESERVED_LAUNCH_PORTS, {}, clear=True):
+            with patch("ida_mcp.proxy.lifecycle.is_wsl_path_bridge_enabled", return_value=True):
+                with patch("ida_mcp.proxy.lifecycle.get_ida_path", return_value=host_target_ida):
+                    with patch("ida_mcp.proxy.lifecycle.get_ida_default_port", return_value=10000):
+                        with patch("ida_mcp.proxy.lifecycle.get_instances", return_value=[]):
+                            with patch("ida_mcp.proxy.lifecycle.get_open_in_ida_bundle_dir", return_value=None):
+                                with patch("ida_mcp.proxy.lifecycle.os.path.exists", side_effect=_fake_exists):
+                                    with patch("ida_mcp.proxy.lifecycle._is_port_bindable", return_value=True):
+                                        with patch("ida_mcp.proxy.lifecycle._use_direct_target_file", return_value=(source_file, None)):
+                                            with patch("subprocess.Popen") as mock_popen:
+                                                result = lifecycle.open_in_ida(source_file, autonomous=False)
+
+        assert "error" in result
+        assert "cannot be translated to a Windows path" in result["error"]
+        mock_popen.assert_not_called()
 
 
 class TestLifecycleClose:

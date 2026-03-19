@@ -145,6 +145,9 @@ proxy/control 面的包装错误常见格式：
 - 如果 `IDA_MCP_BUNDLE_DIR` 或 `open_in_ida_bundle_dir` 已配置，则会在该目录下创建时间戳子目录
 - 若目标旁边存在匹配的 `.i64/.idb`，则优先打开数据库，以避免再次弹出 loader/options 确认框
 - `-A` 会把 IDA 切到 batch/autonomous 启动模式，更适合无人值守自动化；如果你需要正常交互式 GUI 流程，不要把它设成默认
+- `wsl_path_bridge=false` 时，不做 Windows/WSL 路径转换
+- `wsl_path_bridge=true` 时，`ida_path` 和 `open_in_ida_bundle_dir` 视为宿主机 Windows 路径；`open_in_ida` 会把可转换的 WSL 挂载路径转换成 Windows 路径后再启动 IDA
+- `wsl_path_bridge=true` 且最终启动目标不能转换为 Windows 路径时，`open_in_ida` 会返回错误；此时应配置 `open_in_ida_bundle_dir`，先 staging 到 Windows 盘
 
 ## 4. Backend Tool Catalog
 
