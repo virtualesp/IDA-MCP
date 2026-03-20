@@ -64,7 +64,8 @@ def _wsl_to_windows_path(path: str) -> Optional[str]:
     tail = candidate[7:] if len(candidate) > 7 else ""
     if not tail:
         return f"{drive}:\\"
-    return f"{drive}:\\{tail.replace('/', '\\')}"
+    fixed_tail = tail.replace("/", "\\")
+    return f"{drive}:\\{fixed_tail}"
 
 
 def _local_fs_path(path: Optional[str]) -> Optional[str]:
